@@ -1,0 +1,95 @@
+version '0.0.1-SNAPSHOT'
+group 'com.gyf.dao'
+
+buildscript {
+	ext {
+		springBootVersion = '1.5.13.RELEASE'
+	}
+	repositories {
+		maven { url 'http://nexus.spider-iot.cn/repository/maven-public/' } 
+		mavenCentral()
+	}
+	dependencies {
+		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+	}
+}
+
+apply plugin: 'java-library'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    maven { url 'http://nexus.spider-iot.cn/repository/maven-public/' } 
+    jcenter()
+}
+
+dependencies {
+    implementation 'org.springframework.cloud:spring-cloud-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    compile 'mysql:mysql-connector-java:6.0.6'
+    compile 'com.alibaba:druid:1.0.27'
+    compile 'org.mybatis.spring.boot:mybatis-spring-boot-starter:1.2.0'
+    compile 'org.mybatis:mybatis-typehandlers-jsr310:1.0.2'
+ 	compile 'tk.mybatis:mapper-spring-boot-starter:1.1.1'
+ 	compile 'com.github.pagehelper:pagehelper-spring-boot-starter:1.1.0'
+
+    testImplementation 'junit:junit:4.12'
+}
+
+dependencyManagement {
+  imports {
+    mavenBom 'org.springframework.cloud:spring-cloud-dependencies:Edgware.SR3'
+  }
+}
+
+task clientJar(type:Jar, dependsOn: ['classes']) {
+	from('build/classes/java/main') {
+		include('com/gyf/**')
+	}
+	from('build/resources/main') {
+		include('META-INF/**')
+	}
+} 
+
+publishing {
+    repositories {
+        maven {
+            url 'http://nexus.spider-iot.cn/repository/maven-snapshots/'
+            credentials {
+            	username 'gyf-dev' 
+            	password '123456'
+            }
+        }
+    }
+
+    publications {
+        client(MavenPublication) {
+            artifact clientJar
+            groupId "$project.group"
+            artifactId "$project.name"
+            version "$project.version"
+            pom.withXml {
+                def dependenciesNode = asNode().appendNode('dependencies')
+                configurations.compile.allDependencies.each { ModuleDependency dp ->
+                    def dependencyNode = dependenciesNode.appendNode('dependency')
+                    dependencyNode.appendNode('groupId', dp.group)
+                    dependencyNode.appendNode('artifactId', dp.name)
+                    dependencyNode.appendNode('version', dp.version)
+                    if (dp.excludeRules.size() > 0) {
+                        def exclusions = dependencyNode.appendNode('exclusions')
+                        dp.excludeRules.each { ExcludeRule ex ->
+                            def exclusion = exclusions.appendNode('exclusion')
+                            exclusion.appendNode('groupId', ex.group)
+                            exclusion.appendNode('artifactId', ex.module)
+                        }
+            		}
+     			}
+			}
+         }
+     }
+}
